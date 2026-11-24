@@ -4,35 +4,82 @@ name: Android CI
 on:
   push:
     branches: [ main, develop ]
+
   pull_request:
     branches: [ main, develop ]
 
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   build:
+    name: Build ChimeFlow Android
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout source code
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 2. Setup Java
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
+      # 3. Setup Android SDK
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools'
 
+      # 4. Install Android SDK packages
       - name: Install Android SDK
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
+      # 5. Setup Gradle
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
 
-      - name: Build, test and lint
-        run: gradle testDebugUnitTest lintDebug assembleDebug
+      # 6. Verify Gradle
+      - name: Verify Gradle
+        run: gradle --version
+
+      # 7. Run Unit Tests
+      - name: Run Unit Tests
+        run: gradle testDebugUnitTest
+
+      # 8. Run Android Lint
+      - name: Run Android Lint
+        run: gradle lintDebug
+
+      # 9. Build Debug APK
+      - name: Build Debug APK
+        run: gradle assembleDebug
+
+      # 10. Upload APK
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChimeFlow-Debug-APK
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      # 11. Build Summary
+      - name: Build Summary
+        if: success()
+        run: |
+          echo "## ChimeFlow Build Successful" >> $GITHUB_STEP_SUMMARY
+          echo "- Java: 17" >> $GITHUB_STEP_SUMMARY
+          echo "- Gradle: 8.13" >> $GITHUB_STEP_SUMMARY
+          echo "- Android SDK: 36" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- Lint: Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- APK: Generated and uploaded" >> $GITHUB_STEP_SUMMARY
